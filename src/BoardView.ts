@@ -8,12 +8,17 @@ import {
   Setting,
   TextFileView,
   WorkspaceLeaf,
+  moment,
   setIcon,
 } from "obsidian";
-import { Board, Card, STATUSES, Status, TITLES, emptyBoard, parse, serialize } from "./board";
+import { Board, Card, STATUSES, Status, TITLES, emptyBoard, moveCard, parse, serialize, stamp } from "./board";
 import type CardsPlugin from "./main";
 
 export const VIEW_TYPE = "cards-board";
+
+type CardText = Pick<Card, "title" | "description">;
+
+const today = () => moment().format("YYYY-MM-DD");
 
 export class BoardView extends TextFileView {
   private board: Board = emptyBoard();
@@ -59,10 +64,7 @@ export class BoardView extends TextFileView {
   }
 
   private move(from: Status, index: number, to: Status): void {
-    this.update((b) => {
-      const [card] = b.cards[from].splice(index, 1);
-      b.cards[to].push(card);
-    });
+    this.update((b) => moveCard(b, from, index, to, today()));
   }
 
   private resetRenderScope(): Component {
@@ -89,7 +91,9 @@ export class BoardView extends TextFileView {
       header.createSpan({ cls: "cards-column-title", text: TITLES[status] });
       header.createSpan({ cls: "cards-column-count", text: String(cards.length) });
       iconButton(header, "plus", "Add card", () =>
-        new CardModal(this.app, null, (card) => this.update((b) => b.cards[status].push(card))).open()
+        new CardModal(this.app, null, (card) =>
+          this.update((b) => b.cards[status].push(stamp(card, status, today())))
+        ).open()
       );
 
       const list = colEl.createDiv({ cls: "cards-list" });
@@ -97,6 +101,7 @@ export class BoardView extends TextFileView {
         const cardEl = list.createDiv({ cls: "cards-card" });
         const body = cardEl.createDiv({ cls: "cards-card-body" });
         body.createDiv({ cls: "cards-card-title", text: card.title });
+        if (card.done) body.createDiv({ cls: "cards-card-done", text: `\u2705 ${card.done}` });
         if (card.description) {
           const descEl = body.createDiv({ cls: "cards-card-description markdown-rendered" });
           void MarkdownRenderer.render(this.app, card.description, descEl, sourcePath, scope);
@@ -113,7 +118,7 @@ export class BoardView extends TextFileView {
           }
           // Also stops rendered checkboxes toggling; the modal is the one place to edit.
           evt.preventDefault();
-          new CardModal(this.app, card, (c) => this.update((b) => (b.cards[status][i] = c))).open();
+          new CardModal(this.app, card, (c) => this.update((b) => (b.cards[status][i] = { ...card, ...c }))).open();
         });
 
         const actions = cardEl.createDiv({ cls: "cards-card-actions" });
@@ -132,7 +137,7 @@ function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (
 }
 
 class CardModal extends Modal {
-  constructor(app: App, private card: Card | null, private onSubmit: (card: Card) => void) {
+  constructor(app: App, private card: CardText | null, private onSubmit: (card: CardText) => void) {
     super(app);
   }
 

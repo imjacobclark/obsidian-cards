@@ -12,6 +12,9 @@ export interface Card {
   title: string;
   // Markdown, stored in the file as indented lines under the card's list item.
   description: string;
+  // YYYY-MM-DD the card was moved to Done, stored as a trailing "✅ date" on the
+  // title (the Tasks plugin's done-date marker).
+  done?: string;
 }
 
 export interface Board {
@@ -27,6 +30,7 @@ const FRONTMATTER = /^---\r?\n(?:[\s\S]*?\r?\n)?---(?:\r?\n|$)/;
 const HEADING = /^##\s+(.+?)\s*$/;
 const ITEM = /^[-*]\s+(?:\[[ xX]\]\s+)?(.*)$/;
 const INDENT = "  ";
+const DONE_DATE = /\s*\u2705\uFE0F?\s*(\d{4}-\d{2}-\d{2})\s*$/;
 
 // Only the frontmatter and the cards under the three headings survive;
 // anything else in the file is dropped on the next save.
@@ -57,7 +61,7 @@ export function parse(md: string): Board {
     const title = item?.[1].trim();
     if (current && title) {
       finishCard();
-      card = { title, description: "" };
+      card = parseTitle(title);
       board.cards[current].push(card);
     } else if (card && (line.trim() === "" || /^\s/.test(line))) {
       lines.push(line);
@@ -77,11 +81,34 @@ export function serialize(board: Board): string {
   return head + sections.join("\n\n") + "\n";
 }
 
+function parseTitle(text: string): Card {
+  const match = text.match(DONE_DATE);
+  const title = match ? text.slice(0, match.index).trim() : text;
+  // A title that is only a date marker keeps it as the title rather than going blank.
+  if (!match || !title) return { title: text, description: "" };
+  return { title, description: "", done: match[1] };
+}
+
+// Stamps today's date on a card entering Done and clears it on a card leaving Done.
+export function stamp(card: Card, status: Status, today: string): Card {
+  if (status !== "done") {
+    const { done: _, ...rest } = card;
+    return rest;
+  }
+  return card.done ? card : { ...card, done: today };
+}
+
+export function moveCard(board: Board, from: Status, index: number, to: Status, today: string): void {
+  const [card] = board.cards[from].splice(index, 1);
+  board.cards[to].push(stamp(card, to, today));
+}
+
 function serializeCard(card: Card): string {
   const description = card.description
     .split("\n")
     .map((line) => (line.trim() ? INDENT + line : ""));
-  return [`- ${card.title}`, ...(card.description ? description : [])].join("\n");
+  const title = card.done ? `${card.title} \u2705 ${card.done}` : card.title;
+  return [`- ${title}`, ...(card.description ? description : [])].join("\n");
 }
 
 function dedent(lines: string[]): string {

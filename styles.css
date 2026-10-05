@@ -59,6 +59,12 @@
   font-weight: var(--font-medium);
 }
 
+.cards-card-done {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
 .cards-card-description {
   max-height: 12em;
   overflow: hidden;

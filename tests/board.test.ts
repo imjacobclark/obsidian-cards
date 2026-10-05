@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyBoard, parse, serialize } from "../src/board";
+import { emptyBoard, moveCard, parse, serialize, stamp } from "../src/board";
 
 const lines = (...l: string[]) => l.join("\n");
 
@@ -99,5 +99,62 @@ describe("serialize", () => {
   it("round-trips its own output", () => {
     const md = lines("---", "cards: true", "---", "## Todo", "- a", "  **desc**", "", "  more", "", "## Doing", "", "## Done", "- b", "");
     expect(serialize(parse(md))).toBe(md);
+  });
+});
+
+describe("done dates", () => {
+  const TODAY = "2026-10-05";
+
+  it("parses a trailing \u2705 date off the title", () => {
+    const board = parse(lines("## Done", "- Ship it \u2705 2026-10-01", "  notes"));
+    expect(board.cards.done).toEqual([{ title: "Ship it", description: "notes", done: "2026-10-01" }]);
+  });
+
+  it("accepts the emoji variation selector and tight spacing", () => {
+    expect(parse(lines("## Done", "- a \u2705\uFE0F 2026-10-01")).cards.done[0]).toMatchObject({ title: "a", done: "2026-10-01" });
+    expect(parse(lines("## Done", "- a\u27052026-10-01")).cards.done[0]).toMatchObject({ title: "a", done: "2026-10-01" });
+  });
+
+  it("only treats a trailing marker as the done date", () => {
+    const card = parse(lines("## Todo", "- \u2705 2026-10-01 was a good day")).cards.todo[0];
+    expect(card).toEqual({ title: "\u2705 2026-10-01 was a good day", description: "" });
+  });
+
+  it("keeps a title that is only a marker", () => {
+    expect(parse(lines("## Done", "- \u2705 2026-10-01")).cards.done[0]).toEqual({ title: "\u2705 2026-10-01", description: "" });
+  });
+
+  it("writes the marker after the title", () => {
+    const board = emptyBoard();
+    board.cards.done.push({ title: "Ship it", description: "notes", done: "2026-10-01" });
+    expect(serialize(board)).toContain(lines("## Done", "- Ship it \u2705 2026-10-01", "  notes"));
+  });
+
+  it("round-trips done dates", () => {
+    const md = lines("## Todo", "", "## Doing", "", "## Done", "- Ship it \u2705 2026-10-01", "");
+    expect(serialize(parse(md))).toBe(md);
+  });
+
+  it("stamps today when a card enters Done", () => {
+    const board = parse(lines("## Doing", "- a"));
+    moveCard(board, "doing", 0, "done", TODAY);
+    expect(board.cards.doing).toEqual([]);
+    expect(board.cards.done).toEqual([{ title: "a", description: "", done: TODAY }]);
+  });
+
+  it("clears the date when a card leaves Done", () => {
+    const board = parse(lines("## Done", "- a \u2705 2026-10-01"));
+    moveCard(board, "done", 0, "doing", TODAY);
+    expect(board.cards.doing).toEqual([{ title: "a", description: "" }]);
+    expect(serialize(board)).toContain(lines("## Doing", "- a"));
+  });
+
+  it("keeps an existing date rather than restamping", () => {
+    expect(stamp({ title: "a", description: "", done: "2026-01-01" }, "done", TODAY).done).toBe("2026-01-01");
+  });
+
+  it("stamps cards added straight to Done, and nothing else", () => {
+    expect(stamp({ title: "a", description: "" }, "done", TODAY).done).toBe(TODAY);
+    expect(stamp({ title: "a", description: "" }, "todo", TODAY)).not.toHaveProperty("done");
   });
 });

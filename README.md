@@ -12,6 +12,7 @@ Each board is a plain markdown note, so it stays readable without the plugin and
 - Tap a card to edit its title and markdown description.
 - **←** / **→** move a card between columns (**↑** / **↓** on phones, where columns stack vertically).
 - **×** deletes a card.
+- Cards in Done show the date they were finished.
 - **Cards: Toggle board / markdown view**, or the header button, switches to the raw markdown and back.
 
 In the card editor, Enter in the title saves. In the description, Enter adds a new line and Cmd/Ctrl+Enter saves.
@@ -32,11 +33,12 @@ cards: true
 - Plan Q4 roadmap
 
 ## Done
-- Ship v1.2
+- Ship v1.2 ✅ 2026-10-05
 ```
 
 - Each `- ` list item under one of the three headings is a card.
 - Indented lines under a card are its markdown description.
+- Moving a card to Done stamps today's date on it as `✅ YYYY-MM-DD`, the same done-date marker the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) plugin uses. Moving it out of Done removes the date.
 - The board rewrites the note in this format when it saves. Content outside the frontmatter and the three sections is dropped, and task checkboxes (`- [ ]`) are kept as plain items.
 
 ## Installing
