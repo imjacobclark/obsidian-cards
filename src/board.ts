@@ -111,6 +111,16 @@ export function reorderCard(board: Board, status: Status, index: number, delta: 
   [cards[index], cards[target]] = [cards[target], cards[index]];
 }
 
+// The one line of a description shown on its card, and whether more is hidden.
+// Code fence markers are skipped, since a lone fence renders as an empty code block.
+export function descriptionPreview(description: string): { line: string; more: boolean } {
+  const lines = description
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("```"));
+  return { line: lines[0] ?? "", more: lines.length > 1 };
+}
+
 function serializeCard(card: Card): string {
   const description = card.description
     .split("\n")

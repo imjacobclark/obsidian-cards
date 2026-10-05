@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "../src/board";
+import { descriptionPreview, emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "../src/board";
 
 const lines = (...l: string[]) => l.join("\n");
 
@@ -184,5 +184,23 @@ describe("reorderCard", () => {
     const board = parse(lines("## Done", "- a \u2705 2026-10-01", "  about a", "- b"));
     reorderCard(board, "done", 0, 1);
     expect(serialize(board)).toContain(lines("## Done", "- b", "- a \u2705 2026-10-01", "  about a"));
+  });
+});
+
+describe("descriptionPreview", () => {
+  it("is empty for no description", () => {
+    expect(descriptionPreview("")).toEqual({ line: "", more: false });
+  });
+
+  it("shows a single line as-is", () => {
+    expect(descriptionPreview("Draft for **Friday**")).toEqual({ line: "Draft for **Friday**", more: false });
+  });
+
+  it("shows the first non-empty line and flags the rest", () => {
+    expect(descriptionPreview(lines("", "first", "", "  - second"))).toEqual({ line: "first", more: true });
+  });
+
+  it("skips code fence markers", () => {
+    expect(descriptionPreview(lines("```js", "const x = 1;", "```"))).toEqual({ line: "const x = 1;", more: false });
   });
 });

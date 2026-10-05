@@ -3,6 +3,7 @@ import {
   Component,
   Keymap,
   MarkdownRenderer,
+  Menu,
   Modal,
   Setting,
   TextFileView,
@@ -10,7 +11,7 @@ import {
   moment,
   setIcon,
 } from "obsidian";
-import { Board, Card, STATUSES, Status, TITLES, emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "./board";
+import { Board, Card, STATUSES, Status, TITLES, descriptionPreview, emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "./board";
 import type CardsPlugin from "./main";
 
 export const VIEW_TYPE = "cards-board";
@@ -99,9 +100,11 @@ export class BoardView extends TextFileView {
         const body = cardEl.createDiv({ cls: "cards-card-body" });
         body.createDiv({ cls: "cards-card-title", text: card.title });
         if (card.done) body.createDiv({ cls: "cards-card-done", text: `\u2705 ${card.done}` });
-        if (card.description) {
+        const preview = descriptionPreview(card.description);
+        if (preview.line) {
           const descEl = body.createDiv({ cls: "cards-card-description markdown-rendered" });
-          void MarkdownRenderer.render(this.app, card.description, descEl, sourcePath, scope);
+          descEl.toggleClass("has-more", preview.more);
+          void MarkdownRenderer.render(this.app, preview.line, descEl, sourcePath, scope);
         }
         body.addEventListener("click", (evt) => {
           const link = (evt.target as HTMLElement).closest("a");
@@ -118,13 +121,24 @@ export class BoardView extends TextFileView {
           new CardModal(this.app, card, (c) => this.update((b) => (b.cards[status][i] = { ...card, ...c }))).open();
         });
 
-        const actions = cardEl.createDiv({ cls: "cards-card-actions" });
         // Unavailable buttons stay in place but hidden, so buttons line up across cards.
-        iconButton(actions, "arrow-up", "Move up", () => this.update((b) => reorderCard(b, status, i, -1)), i > 0);
-        iconButton(actions, "arrow-down", "Move down", () => this.update((b) => reorderCard(b, status, i, 1)), i < cards.length - 1);
-        iconButton(actions, "arrow-left", prev ? `Move to ${TITLES[prev]}` : "", () => prev && this.move(status, i, prev), !!prev);
-        iconButton(actions, "arrow-right", next ? `Move to ${TITLES[next]}` : "", () => next && this.move(status, i, next), !!next);
-        iconButton(actions, "x", "Delete card", () => this.update((b) => b.cards[status].splice(i, 1)));
+        const order = cardEl.createDiv({ cls: "cards-card-actions cards-card-order" });
+        iconButton(order, "arrow-up", "Move up", () => this.update((b) => reorderCard(b, status, i, -1)), i > 0);
+        iconButton(order, "arrow-down", "Move down", () => this.update((b) => reorderCard(b, status, i, 1)), i < cards.length - 1);
+
+        const moves = cardEl.createDiv({ cls: "cards-card-actions cards-card-moves" });
+        iconButton(moves, "arrow-left", prev ? `Move to ${TITLES[prev]}` : "", () => prev && this.move(status, i, prev), !!prev);
+        iconButton(moves, "arrow-right", next ? `Move to ${TITLES[next]}` : "", () => next && this.move(status, i, next), !!next);
+
+        onContextMenu(cardEl, (menu) =>
+          menu.addItem((item) =>
+            item
+              .setTitle("Delete card")
+              .setIcon("trash-2")
+              .setWarning(true)
+              .onClick(() => this.update((b) => b.cards[status].splice(i, 1)))
+          )
+        );
       });
     });
   }
@@ -135,6 +149,53 @@ function iconButton(parent: HTMLElement, icon: string, label: string, onClick: (
   setIcon(button, icon);
   button.disabled = !enabled;
   button.addEventListener("click", onClick);
+}
+
+const LONG_PRESS_MS = 500;
+
+// Right-click on desktop; long-press on touch, where iOS sends no contextmenu event.
+function onContextMenu(el: HTMLElement, build: (menu: Menu) => void): void {
+  let lastShown = 0;
+  const show = (x: number, y: number) => {
+    // Android sends contextmenu on long-press as well, so don't open the menu twice.
+    if (Date.now() - lastShown < 1000) return;
+    lastShown = Date.now();
+    const menu = new Menu();
+    build(menu);
+    menu.showAtPosition({ x, y });
+  };
+
+  el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    show(e.clientX, e.clientY);
+  });
+
+  let timer: number | null = null;
+  let pressed = false;
+  const cancel = () => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = null;
+  };
+  el.addEventListener(
+    "touchstart",
+    (e) => {
+      pressed = false;
+      const { clientX, clientY } = e.touches[0];
+      cancel();
+      timer = window.setTimeout(() => {
+        pressed = true;
+        show(clientX, clientY);
+      }, LONG_PRESS_MS);
+    },
+    { passive: true }
+  );
+  el.addEventListener("touchmove", cancel, { passive: true });
+  el.addEventListener("touchcancel", cancel);
+  el.addEventListener("touchend", (e) => {
+    cancel();
+    // Swallow the tap that ends a long-press so it doesn't also open the card.
+    if (pressed) e.preventDefault();
+  });
 }
 
 class CardModal extends Modal {
