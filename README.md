@@ -10,7 +10,8 @@ Each board is a plain markdown note, so it stays readable without the plugin and
 - Any note with `cards: true` in its frontmatter opens as a board. You can also right-click a note and choose **Open as board**.
 - **+** adds a card to a column.
 - Tap a card to edit its title and markdown description.
-- **←** / **→** move a card between columns (**↑** / **↓** on phones, where columns stack vertically).
+- **↑** / **↓** move a card up or down its column, so you can keep the most important cards at the top.
+- **←** / **→** move a card to the previous or next column. On phones the columns stack vertically, so left means the column above and right means the column below.
 - **×** deletes a card.
 - Cards in Done show the date they were finished.
 - **Cards: Toggle board / markdown view**, or the header button, switches to the raw markdown and back.

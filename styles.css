@@ -39,7 +39,7 @@
 
 .cards-card {
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
   gap: var(--size-4-1);
   padding: var(--size-4-2);
   background: var(--background-primary);
@@ -48,7 +48,6 @@
 }
 
 .cards-card-body {
-  flex: 1;
   min-width: 0;
   padding: var(--size-4-1) 0;
   cursor: pointer;
@@ -79,7 +78,12 @@
 
 .cards-card-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 2px;
+}
+
+.cards-button:disabled {
+  visibility: hidden;
 }
 
 .cards-button {

@@ -103,6 +103,14 @@ export function moveCard(board: Board, from: Status, index: number, to: Status, 
   board.cards[to].push(stamp(card, to, today));
 }
 
+// Moves a card one place up (-1) or down (+1) within its column.
+export function reorderCard(board: Board, status: Status, index: number, delta: -1 | 1): void {
+  const cards = board.cards[status];
+  const target = index + delta;
+  if (target < 0 || target >= cards.length) return;
+  [cards[index], cards[target]] = [cards[target], cards[index]];
+}
+
 function serializeCard(card: Card): string {
   const description = card.description
     .split("\n")

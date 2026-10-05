@@ -4,14 +4,13 @@ import {
   Keymap,
   MarkdownRenderer,
   Modal,
-  Platform,
   Setting,
   TextFileView,
   WorkspaceLeaf,
   moment,
   setIcon,
 } from "obsidian";
-import { Board, Card, STATUSES, Status, TITLES, emptyBoard, moveCard, parse, serialize, stamp } from "./board";
+import { Board, Card, STATUSES, Status, TITLES, emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "./board";
 import type CardsPlugin from "./main";
 
 export const VIEW_TYPE = "cards-board";
@@ -78,8 +77,6 @@ export class BoardView extends TextFileView {
     const sourcePath = this.file?.path ?? "";
     this.contentEl.empty();
     const boardEl = this.contentEl.createDiv({ cls: "cards-board" });
-    // Columns stack vertically on phones, so arrows point up/down there.
-    const [prevIcon, nextIcon] = Platform.isPhone ? ["arrow-up", "arrow-down"] : ["arrow-left", "arrow-right"];
 
     STATUSES.forEach((status, col) => {
       const cards = this.board.cards[status];
@@ -122,17 +119,21 @@ export class BoardView extends TextFileView {
         });
 
         const actions = cardEl.createDiv({ cls: "cards-card-actions" });
-        if (prev) iconButton(actions, prevIcon, `Move to ${TITLES[prev]}`, () => this.move(status, i, prev));
-        if (next) iconButton(actions, nextIcon, `Move to ${TITLES[next]}`, () => this.move(status, i, next));
+        // Unavailable buttons stay in place but hidden, so buttons line up across cards.
+        iconButton(actions, "arrow-up", "Move up", () => this.update((b) => reorderCard(b, status, i, -1)), i > 0);
+        iconButton(actions, "arrow-down", "Move down", () => this.update((b) => reorderCard(b, status, i, 1)), i < cards.length - 1);
+        iconButton(actions, "arrow-left", prev ? `Move to ${TITLES[prev]}` : "", () => prev && this.move(status, i, prev), !!prev);
+        iconButton(actions, "arrow-right", next ? `Move to ${TITLES[next]}` : "", () => next && this.move(status, i, next), !!next);
         iconButton(actions, "x", "Delete card", () => this.update((b) => b.cards[status].splice(i, 1)));
       });
     });
   }
 }
 
-function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => void): void {
+function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => void, enabled = true): void {
   const button = parent.createEl("button", { cls: "clickable-icon cards-button", attr: { "aria-label": label } });
   setIcon(button, icon);
+  button.disabled = !enabled;
   button.addEventListener("click", onClick);
 }
 

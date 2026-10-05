@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyBoard, moveCard, parse, serialize, stamp } from "../src/board";
+import { emptyBoard, moveCard, parse, reorderCard, serialize, stamp } from "../src/board";
 
 const lines = (...l: string[]) => l.join("\n");
 
@@ -156,5 +156,33 @@ describe("done dates", () => {
   it("stamps cards added straight to Done, and nothing else", () => {
     expect(stamp({ title: "a", description: "" }, "done", TODAY).done).toBe(TODAY);
     expect(stamp({ title: "a", description: "" }, "todo", TODAY)).not.toHaveProperty("done");
+  });
+});
+
+describe("reorderCard", () => {
+  const titles = (md: string, move: (b: ReturnType<typeof parse>) => void) => {
+    const board = parse(md);
+    move(board);
+    return board.cards.todo.map((c) => c.title);
+  };
+  const md = lines("## Todo", "- a", "- b", "- c");
+
+  it("moves a card up", () => {
+    expect(titles(md, (b) => reorderCard(b, "todo", 2, -1))).toEqual(["a", "c", "b"]);
+  });
+
+  it("moves a card down", () => {
+    expect(titles(md, (b) => reorderCard(b, "todo", 0, 1))).toEqual(["b", "a", "c"]);
+  });
+
+  it("does nothing past either end", () => {
+    expect(titles(md, (b) => reorderCard(b, "todo", 0, -1))).toEqual(["a", "b", "c"]);
+    expect(titles(md, (b) => reorderCard(b, "todo", 2, 1))).toEqual(["a", "b", "c"]);
+  });
+
+  it("keeps descriptions and done dates with their card", () => {
+    const board = parse(lines("## Done", "- a \u2705 2026-10-01", "  about a", "- b"));
+    reorderCard(board, "done", 0, 1);
+    expect(serialize(board)).toContain(lines("## Done", "- b", "- a \u2705 2026-10-01", "  about a"));
   });
 });
