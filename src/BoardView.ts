@@ -1,0 +1,183 @@
+import {
+  App,
+  Component,
+  Keymap,
+  MarkdownRenderer,
+  Modal,
+  Platform,
+  Setting,
+  TextFileView,
+  WorkspaceLeaf,
+  setIcon,
+} from "obsidian";
+import { Board, Card, STATUSES, Status, TITLES, emptyBoard, parse, serialize } from "./board";
+import type CardsPlugin from "./main";
+
+export const VIEW_TYPE = "cards-board";
+
+export class BoardView extends TextFileView {
+  private board: Board = emptyBoard();
+  // Owns the rendered markdown of one render pass; replaced on every re-render.
+  private renderScope: Component | null = null;
+
+  constructor(leaf: WorkspaceLeaf, private plugin: CardsPlugin) {
+    super(leaf);
+    this.addAction("file-text", "Open as markdown", () => this.plugin.openAsMarkdown(this.leaf));
+  }
+
+  getViewType(): string {
+    return VIEW_TYPE;
+  }
+
+  getDisplayText(): string {
+    return this.file?.basename ?? "Board";
+  }
+
+  getIcon(): string {
+    return "layout-dashboard";
+  }
+
+  getViewData(): string {
+    return serialize(this.board);
+  }
+
+  setViewData(data: string): void {
+    this.board = parse(data);
+    this.render();
+  }
+
+  clear(): void {
+    this.board = emptyBoard();
+    this.resetRenderScope();
+    this.contentEl.empty();
+  }
+
+  private update(fn: (board: Board) => void): void {
+    fn(this.board);
+    this.render();
+    this.requestSave();
+  }
+
+  private move(from: Status, index: number, to: Status): void {
+    this.update((b) => {
+      const [card] = b.cards[from].splice(index, 1);
+      b.cards[to].push(card);
+    });
+  }
+
+  private resetRenderScope(): Component {
+    if (this.renderScope) this.removeChild(this.renderScope);
+    this.renderScope = this.addChild(new Component());
+    return this.renderScope;
+  }
+
+  private render(): void {
+    const scope = this.resetRenderScope();
+    const sourcePath = this.file?.path ?? "";
+    this.contentEl.empty();
+    const boardEl = this.contentEl.createDiv({ cls: "cards-board" });
+    // Columns stack vertically on phones, so arrows point up/down there.
+    const [prevIcon, nextIcon] = Platform.isPhone ? ["arrow-up", "arrow-down"] : ["arrow-left", "arrow-right"];
+
+    STATUSES.forEach((status, col) => {
+      const cards = this.board.cards[status];
+      const prev = STATUSES[col - 1];
+      const next = STATUSES[col + 1];
+
+      const colEl = boardEl.createDiv({ cls: "cards-column" });
+      const header = colEl.createDiv({ cls: "cards-column-header" });
+      header.createSpan({ cls: "cards-column-title", text: TITLES[status] });
+      header.createSpan({ cls: "cards-column-count", text: String(cards.length) });
+      iconButton(header, "plus", "Add card", () =>
+        new CardModal(this.app, null, (card) => this.update((b) => b.cards[status].push(card))).open()
+      );
+
+      const list = colEl.createDiv({ cls: "cards-list" });
+      cards.forEach((card, i) => {
+        const cardEl = list.createDiv({ cls: "cards-card" });
+        const body = cardEl.createDiv({ cls: "cards-card-body" });
+        body.createDiv({ cls: "cards-card-title", text: card.title });
+        if (card.description) {
+          const descEl = body.createDiv({ cls: "cards-card-description markdown-rendered" });
+          void MarkdownRenderer.render(this.app, card.description, descEl, sourcePath, scope);
+        }
+        body.addEventListener("click", (evt) => {
+          const link = (evt.target as HTMLElement).closest("a");
+          if (link) {
+            if (link.hasClass("internal-link")) {
+              evt.preventDefault();
+              const href = link.dataset.href ?? link.getAttr("href") ?? "";
+              void this.app.workspace.openLinkText(href, sourcePath, Keymap.isModEvent(evt));
+            }
+            return;
+          }
+          // Also stops rendered checkboxes toggling; the modal is the one place to edit.
+          evt.preventDefault();
+          new CardModal(this.app, card, (c) => this.update((b) => (b.cards[status][i] = c))).open();
+        });
+
+        const actions = cardEl.createDiv({ cls: "cards-card-actions" });
+        if (prev) iconButton(actions, prevIcon, `Move to ${TITLES[prev]}`, () => this.move(status, i, prev));
+        if (next) iconButton(actions, nextIcon, `Move to ${TITLES[next]}`, () => this.move(status, i, next));
+        iconButton(actions, "x", "Delete card", () => this.update((b) => b.cards[status].splice(i, 1)));
+      });
+    });
+  }
+}
+
+function iconButton(parent: HTMLElement, icon: string, label: string, onClick: () => void): void {
+  const button = parent.createEl("button", { cls: "clickable-icon cards-button", attr: { "aria-label": label } });
+  setIcon(button, icon);
+  button.addEventListener("click", onClick);
+}
+
+class CardModal extends Modal {
+  constructor(app: App, private card: Card | null, private onSubmit: (card: Card) => void) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.titleEl.setText(this.card ? "Edit card" : "New card");
+    this.modalEl.addClass("cards-modal");
+
+    const title = this.contentEl.createEl("input", {
+      type: "text",
+      cls: "cards-modal-title",
+      value: this.card?.title ?? "",
+      attr: { placeholder: "Title" },
+    });
+    const description = this.contentEl.createEl("textarea", {
+      cls: "cards-modal-description",
+      attr: { placeholder: "Description (markdown)", rows: "8" },
+    });
+    description.value = this.card?.description ?? "";
+
+    const submit = () => {
+      const text = title.value.replace(/\s+/g, " ").trim();
+      if (text) this.onSubmit({ title: text, description: cleanDescription(description.value) });
+      this.close();
+    };
+
+    title.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing) {
+        e.preventDefault();
+        submit();
+      }
+    });
+    // Enter adds a newline in the description; Cmd/Ctrl+Enter saves from anywhere.
+    this.scope.register(["Mod"], "Enter", () => {
+      submit();
+      return false;
+    });
+    new Setting(this.contentEl).addButton((b) => b.setButtonText("Save").setCta().onClick(submit));
+    title.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
+function cleanDescription(value: string): string {
+  return value.replace(/\r\n?/g, "\n").replace(/^(?:[ \t]*\n)+/, "").trimEnd();
+}

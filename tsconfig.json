@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "target": "ES2018",
+    "moduleResolution": "node",
+    "isolatedModules": true,
+    "strict": true,
+    "noEmit": true,
+    "lib": ["DOM", "ES2020"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "obsidian-cards",
+  "version": "0.1.0",
+  "description": "A minimal Todo / Doing / Done board for Obsidian.",
+  "main": "main.js",
+  "private": true,
+  "author": "Jacob Clark <jacob.jh.clark@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imjacobclark/obsidian-cards.git"
+  },
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.13.1",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.7"
+  }
+}

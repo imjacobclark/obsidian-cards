@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-cards",
+  "name": "Cards",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "A minimal Todo / Doing / Done board stored as a plain markdown note.",
+  "author": "Jacob Clark",
+  "authorUrl": "https://github.com/imjacobclark",
+  "isDesktopOnly": false
+}
