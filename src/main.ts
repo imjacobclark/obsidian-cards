@@ -10,7 +10,7 @@ export default class CardsPlugin extends Plugin {
   async onload(): Promise<void> {
     this.registerView(VIEW_TYPE, (leaf) => new BoardView(leaf, this));
 
-    this.addRibbonIcon("layout-dashboard", "Create new board", () => this.createBoard());
+    this.addRibbonIcon("square-kanban", "Create new board", () => this.createBoard());
 
     this.addCommand({
       id: "create-board",
@@ -39,7 +39,7 @@ export default class CardsPlugin extends Plugin {
         menu.addItem((item) =>
           item
             .setTitle("Open as board")
-            .setIcon("layout-dashboard")
+            .setIcon("square-kanban")
             .onClick(() => this.openAsBoard(leaf ?? this.app.workspace.getLeaf(false), file))
         );
       })

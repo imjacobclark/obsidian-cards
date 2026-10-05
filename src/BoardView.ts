@@ -39,7 +39,7 @@ export class BoardView extends TextFileView {
   }
 
   getIcon(): string {
-    return "layout-dashboard";
+    return "square-kanban";
   }
 
   getViewData(): string {
